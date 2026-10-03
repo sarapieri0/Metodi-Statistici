@@ -1,3 +1,13 @@
+/*Codice che permette di visualizzare gli istogrammi relativi all'energia depositata, calcolando anche il valore d'aspettazione del numero di hit di rumore
+per evento, in ambo le modalità discusse.
+In questo codice si studiano anche le frequenze dei vari casi di hit multipli e hit di rumore che si riscontrano
+nel processo di selezione delle tracce.
+
+Esecuzione:
+.L hits.cpp+
+.L statistica.cpp+
+DoAll()*/
+
 #include "TF1.h" 
 #include "TH1F.h" 
 #include "TH1I.h" 
@@ -16,6 +26,7 @@
 #include <TMath.h>
 #include <algorithm> 
 #include <TLegend.h> 
+#include <TStyle.h> 
 #include "hits_header.h"
 
 
@@ -36,10 +47,8 @@ TH1F *E_depy4 = nullptr;
 TH1F *E_depy5 = nullptr;
 
 
-
-TCanvas *c_scarti = nullptr;
-TCanvas *c_energiax = nullptr;
-TCanvas *c_energiay = nullptr;
+TH1F *E_depx_tot = nullptr;
+TH1F *E_depy_tot = nullptr;
 
 
 
@@ -107,174 +116,253 @@ void energy(){
     E_depy4 =new TH1F("E_depy4", "Energia depositata layer 4, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
     E_depy5 =new TH1F("E_depy5", "Energia depositata layer 5, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
 
+    E_depx_tot =new TH1F("E_depx_tot", "Energia depositata coordinata X; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depy_tot =new TH1F("E_depy_tot", "Energia depositata coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+
     for(Int_t i=0; i<t->GetEntries(); i++){
         t->GetEntry(i);
         //if(i%1000==0) cout<<"ciclo "<<i<<endl;
         for(int k=0; k<10; k++){
+            if(X[2][k] == -999) continue;
+
+            E_depx_tot->Fill(Edep[0][k]);
+            E_depy_tot->Fill(Edep[1][k]);
+            
             if(X[2][k]==0.){
                 E_depx1->Fill(Edep[0][k]);
                 E_depy1->Fill(Edep[1][k]);
             } 
-            if(X[2][k]==250.){
+            else if(X[2][k]==250.){
                 E_depx2->Fill(Edep[0][k]);
                 E_depy2->Fill(Edep[1][k]);
             }
-            if(X[2][k]==500.){
+            else if(X[2][k]==500.){
                 E_depx3->Fill(Edep[0][k]);
                 E_depy3->Fill(Edep[1][k]);
             }
-            if(X[2][k]==750.){
+            else if(X[2][k]==750.){
                 E_depx4->Fill(Edep[0][k]);
                 E_depy4->Fill(Edep[1][k]);
             }
-            if(X[2][k]==1000.){
+            else if(X[2][k]==1000.){
                 E_depx5->Fill(Edep[0][k]);
                 E_depy5->Fill(Edep[1][k]);
             }
+            else continue;
+            
         }    
     }
 
-    //c_energiax = new TCanvas("c_energiax", "c_energiax", 3000, 600);
-    //c_energiax->Divide(5,1);
-
-    TCanvas *c_x[5];
+    //TCanvas *c_x[5];
+    //gStyle->SetOptStat("ne"); 
+    //gStyle->SetOptFit(0);
 
     TH1F *h_listx[5] = {E_depx1, E_depx2, E_depx3, E_depx4, E_depx5};
     TH1F *h_listy[5] = {E_depy1, E_depy2, E_depy3, E_depy4, E_depy5};
 
-    //COORDINATA X
-    for(int j=0; j<5; j++){
+    
+    cout<<"\n---------------Coordinata X---------------"<<endl;
+    for(int i=0; i<5; i++){
+        //c_x[i] = new TCanvas(Form("c_x%d", i+1), Form("c_x%d", i+1), 800, 600);
 
+        if(i<3){
+            TF1 *landau_tot = new TF1("landau_tot", "landau(0) + landau(3)", 0, 400000);
+            landau_tot->SetParameter(0, h_listx[i]->GetMaximum()*0.5);
+            landau_tot->SetParameter(1, 7500);
+            landau_tot->SetParameter(2, 7500);
+
+            landau_tot->SetParameter(3, h_listx[i]->GetMaximum()*0.5);
+            landau_tot->SetParameter(4, 86000);
+            landau_tot->SetParameter(5, 10000);
+
+            h_listx[i]->Fit(landau_tot, "L RQN");
+            mu_sglx.push_back(landau_tot->GetParameter(4));
+            sigma_sglx.push_back(landau_tot->GetParameter(5));
+            mu_bkgx.push_back(landau_tot->GetParameter(1));
+            sigma_bkgx.push_back(landau_tot->GetParameter(2));
+
+            //h_listx[i]->SetStats(0);
+           /*h_listx[i]->SetFillColor(kViolet-9);
+            h_listx[i]->SetLineColor(kViolet-9);
+            h_listx[i]->Draw("hist");
+            c_x[i]->SetLogy(1);
+            landau_tot->Draw("same");*/
+        }
         
-        TF1 *f_bkg = new TF1("f_bkg", "landau", 0, 60000);
-        f_bkg->SetParameters(100000, 10000, 3000);
-        f_bkg->SetLineColor(kBlue);
 
-        TF1 *f_sgl = new TF1("f_sgl", "landau", 50000, 400000);
-        f_sgl->SetParameters(500000, 120000, 15000);
-
-        c_x[j] = new TCanvas(Form("c_x%d", j+1), "energiax", 800, 600);
-        //c_energiax->cd(j+1);
-        gPad->SetLogy(1);
-        h_listx[j]->SetStats(0);
-        h_listx[j]->SetFillColor(kViolet-9);
-        h_listx[j]->SetLineColor(kViolet-9);
-        h_listx[j]->Draw("hist");
-        h_listx[j]->Fit(f_sgl, "RQ +");
-        mu_sglx.push_back(f_sgl->GetParameter(1));
-        sigma_sglx.push_back(f_sgl->GetParameter(2));
-        f_sgl->Draw("same");
-
-        auto legend = new TLegend(0.6,0.7,0.9,0.9);
-        legend->AddEntry(h_listx[j],"Energia depositata","f");
-        legend->AddEntry("f_sgl","Fit: Landau segnale","l");
-        legend->AddEntry("f_bkg","Fit: Landau rumore","l");
-        legend->Draw();
-
-        if(j<3){
-            h_listx[j]->Fit(f_bkg, "RQ");
-            mu_bkgx.push_back(f_bkg->GetParameter(1));
-            sigma_bkgx.push_back(f_bkg->GetParameter(2));
-            f_bkg->Draw("same");
-        }
         else{
-            continue;
-        }
+            TF1 *f_sgl = new TF1("f_sgl", "landau", 40000, 400000);
+            f_sgl->SetParameters(400000, 90000, 10000);
 
+            h_listx[i]->Fit(f_sgl, "RQN");
+            mu_sglx.push_back(f_sgl->GetParameter(1));
+            sigma_sglx.push_back(f_sgl->GetParameter(2));
+
+            //c_energiax->cd(j+1);
+            //c_x[i]->SetLogy(1);
+            //h_listx[j]->SetStats(0);
+            /*h_listx[i]->SetFillColor(kViolet-9);
+            h_listx[i]->SetLineColor(kViolet-9);
+            h_listx[i]->Draw("hist");
+            f_sgl->Draw("same");*/
+        }
+        //c_x[i]->Modified();
+        //c_x[i]->Update();
+        
     }
 
-    c_energiay = new TCanvas("c_energiay", "c_energiay", 3000, 600);
-    c_energiay->Divide(5,1);
+    //TCanvas *c_energiax = new TCanvas("c_energiax", "c_energiax", 800, 600);
+    TF1 *landau_totx = new TF1("landau_totx", "landau(0) + landau(3)", 0, 400000);
+    landau_totx->SetParameter(0, E_depx_tot->GetMaximum()*0.5);
+    landau_totx->SetParameter(1, 7500);
+    landau_totx->SetParameter(2, 7500);
 
-    //COORDINATA Y
-    for(int j=0; j<5; j++){
-        TF1 *f_bkg = new TF1("f_bkg", "landau", 0, 60000);
-        f_bkg->SetParameters(100000, 10000, 3000);
-        f_bkg->SetLineColor(kBlue);
+    landau_totx->SetParameter(3, E_depx_tot->GetMaximum()*0.5);
+    landau_totx->SetParameter(4, 86000);
+    landau_totx->SetParameter(5, 10000);
 
-        TF1 *f_sgl = new TF1("f_sgl", "landau", 50000, 400000);
+    E_depx_tot->Fit(landau_totx, "L R N");
+
+    //c_energiax->SetLogy(1);
+    E_depx_tot->SetFillColor(kBlue-9);
+    E_depx_tot->SetLineColor(kBlue-9);
+    E_depx_tot->Draw("hist");
+    //landau_totx->Draw("same");
+
+
+    TF1 *f_noisex = new TF1("f_noisex", "landau", 0, 400000);
+    f_noisex->SetParameters(landau_totx->GetParameter(0), landau_totx->GetParameter(1), landau_totx->GetParameter(2));
+    f_noisex->Draw("same");
+
+    TF1 *f_signalx = new TF1("f_signalx", "landau", 0, 400000);
+    f_signalx->SetParameters(landau_totx->GetParameter(3), landau_totx->GetParameter(4), landau_totx->GetParameter(5));
+
+    //c_energiax->Modified();
+    //c_energiax->Update();
+
+    // Calcola l'integrale esatto della curva nell'intervallo dell'istogramma
+    double total_noise_eventsx = f_noisex->Integral(0, 400000) / E_depx_tot->GetBinWidth(1);
+    double total_signal_eventsx = f_signalx->Integral(0, 400000) / E_depx_tot->GetBinWidth(1);
+    std::cout << "Eventi di rumore stimati: " << total_noise_eventsx << std::endl;
+    std::cout << "Eventi di segnale stimati: " << total_signal_eventsx << std::endl;
+
+
+
+
+
+
+    cout<<"\n---------------Coordinata Y---------------"<<endl;
+    for(int i=0; i<3; i++){
+        TF1 *landau_tot = new TF1("landau_tot", "landau(0) + landau(3)", 0, 400000);
+        landau_tot->SetParameter(0, h_listy[i]->GetMaximum()*0.5);
+        landau_tot->SetParameter(1, 7500);
+        landau_tot->SetParameter(2, 7500);
+
+        landau_tot->SetParameter(3, h_listy[i]->GetMaximum()*0.5);
+        landau_tot->SetParameter(4, 86000);
+        landau_tot->SetParameter(5, 10000);
+
+        h_listy[i]->Fit(landau_tot, "L RQ N");
+        mu_sgly.push_back(landau_tot->GetParameter(4));
+        sigma_sgly.push_back(landau_tot->GetParameter(5));
+        mu_bkgy.push_back(landau_tot->GetParameter(1));
+        sigma_bkgy.push_back(landau_tot->GetParameter(2));
+    }
+
+    
+    for(int j=3; j<5; j++){
+
+        TF1 *f_sgl = new TF1("f_sgl", "landau", 40000, 400000);
         f_sgl->SetParameters(500000, 120000, 15000);
 
-        c_energiay->cd(j+1);
-        gPad->SetLogy(1);
-        h_listy[j]->SetStats(0);
-        h_listy[j]->SetFillColor(kGreen-9);
-        h_listy[j]->SetLineColor(kGreen-9);
-        h_listy[j]->Draw("hist");
-        h_listy[j]->Fit(f_sgl, "RQ +");
+        h_listy[j]->Fit(f_sgl, "RQ N");
         mu_sgly.push_back(f_sgl->GetParameter(1));
         sigma_sgly.push_back(f_sgl->GetParameter(2));
-        f_sgl->Draw("same");
 
-        if(j<3){
-            h_listy[j]->Fit(f_bkg, "RQ");
-            mu_bkgy.push_back(f_bkg->GetParameter(1));
-            sigma_bkgy.push_back(f_bkg->GetParameter(2));
-            f_bkg->Draw("same");
-        }
-        else{
-            continue;
-        }
+        //gPad->SetLogy(1);
+        //h_listy[j]->SetStats(0);
+        //h_listy[j]->SetFillColor(kGreen-9);
+        //h_listy[j]->SetLineColor(kGreen-9);
+        //h_listy[j]->Draw("hist");
+        //f_sgl->Draw("same");        
         
 
     }
+    //TCanvas *c_energiay = new TCanvas("c_energiay", "c_energiay", 800, 600);
+
+    TF1 *landau_toty = new TF1("landau_toty", "landau(0) + landau(3)", 0, 400000);
+    landau_toty->SetParameter(0, E_depy_tot->GetMaximum()*0.5);
+    landau_toty->SetParameter(1, 7500);
+    landau_toty->SetParameter(2, 7500);
+
+    landau_toty->SetParameter(3, E_depy_tot->GetMaximum()*0.5);
+    landau_toty->SetParameter(4, 86000);
+    landau_toty->SetParameter(5, 10000);
+
+    E_depy_tot->Fit(landau_toty, "L R N");
+
+    //c_energiay->SetLogy(1);
+    E_depy_tot->SetFillColor(kBlue-9);
+    E_depy_tot->SetLineColor(kBlue-9);
+    //E_depy_tot->Draw("hist");
+    //landau_toty->Draw("same");
+
+    //c_energiay->Modified();
+    //c_energiay->Update();
+
+    TF1 *f_noisey = new TF1("f_noisey", "landau", 0, 400000);
+    f_noisey->SetParameters(landau_toty->GetParameter(0), landau_toty->GetParameter(1), landau_toty->GetParameter(2));
+
+    TF1 *f_signaly = new TF1("f_signaly", "landau", 0, 400000);
+    f_signaly->SetParameters(landau_toty->GetParameter(3), landau_toty->GetParameter(4), landau_toty->GetParameter(5));
+
+    // Calcola l'integrale esatto della curva nell'intervallo dell'istogramma
+    double total_noise_eventsy = f_noisey->Integral(0, 400000) / E_depy_tot->GetBinWidth(1);
+    double total_signal_eventsy = f_signaly->Integral(0, 400000) / E_depy_tot->GetBinWidth(1);
+    std::cout << "Eventi di rumore stimati: " << total_noise_eventsy << std::endl;
+    std::cout << "Eventi di segnale stimati: " << total_signal_eventsy << std::endl;
 
 
-    cout<<"\n\nMedie Landau per rumore (background) X: "<<endl;
+    
+    
+
+    /*cout<<"\n\nMedie Landau per rumore (background) X: "<<endl;
     for(int i=0; i<3; i++){
         cout<<mu_bkgx[i]<<", ";
     }
     cout<<"\nSigma Landau per rumore (background) X: "<<endl;
     for(int i=0; i<3; i++){
         cout<<sigma_bkgx[i]<<", ";
-    }
+    }*/
 
-    cout<<"\n\nMedie Landau per rumore (background) Y: "<<endl;
+    /*cout<<"\n\nMedie Landau per rumore (background) Y: "<<endl;
     for(int i=0; i<3; i++){
         cout<<mu_bkgy[i]<<", ";
     }
     cout<<"\nSigma Landau per rumore (background) Y: "<<endl;
     for(int i=0; i<3; i++){
         cout<<sigma_bkgy[i]<<", ";
-    }
+    }*/
 
     
-    cout<<"\n\nMedie Landau per segnale (signal) X: "<<endl;
+    /*cout<<"\n\nMedie Landau per segnale (signal) X: "<<endl;
     for(int i=0; i<5; i++){
         cout<<mu_sglx[i]<<", ";
     }
     cout<<"\nSigma Landau per segnale (signal) X: "<<endl;
     for(int i=0; i<5; i++){
         cout<<sigma_sglx[i]<<", ";
-    }
+    }*/
 
-    cout<<"\n\nMedie Landau per segnale (signal) Y: "<<endl;
+    /*cout<<"\n\nMedie Landau per segnale (signal) Y: "<<endl;
     for(int i=0; i<5; i++){
         cout<<mu_sgly[i]<<", ";
     }
     cout<<"\nSigma Landau per segnale (signal) Y: "<<endl;
     for(int i=0; i<5; i++){
         cout<<sigma_sgly[i]<<", ";
-    }
+    }*/
 
-/*
-    double mu_bkg_totx = 0;
-    double mu_bkg_toty = 0;
-    double w_totx = 0;
-    double w_toty = 0;
-    for(int i=0; i<3; i++){
-        mu_bkg_totx = mu_bkg_totx + mu_bkgx[i]/(sigma_bkgx[i]*sigma_bkgx[i]);
-        mu_bkg_toty = mu_bkg_toty + mu_bkgy[i]/(sigma_bkgy[i]*sigma_bkgy[i]);
-        w_totx = w_totx + 1/(sigma_bkgx[i]*sigma_bkgx[i]);
-        w_toty = w_toty + 1/(sigma_bkgy[i]*sigma_bkgy[i]);
-    }
-
-    mu_bkg_totx = mu_bkg_totx/w_totx;
-    mu_bkg_toty = mu_bkg_toty/w_toty;
-
-    cout<<"\n\nValore d'aspettazione di hit di rumore per evento:"<<endl;
-    cout<<"X: "<<mu_bkg_totx<<" +- "<<sqrt(1/w_totx)<<endl;
-    cout<<"Y: "<<mu_bkg_toty<<" +- "<<sqrt(1/w_toty)<<endl;*/
     
 }
 
@@ -282,6 +370,14 @@ void energy(){
 
 
 void fit_x(){
+    cout<<"\n\nMedie Landau per rumore (background) X: "<<endl;
+    for(int i=0; i<3; i++){
+        cout<<mu_bkgx[i]<<", ";
+    }
+    cout<<"\n\nMedie Landau per segnale (signal) X: "<<endl;
+    for(int i=0; i<5; i++){
+        cout<<mu_sglx[i]<<", ";
+    }
     vector<double> z;
     vector<double> x;
     vector<double> e_dep;
@@ -344,13 +440,14 @@ void fit_x(){
                         if(z[kk]==z_coords[k]){
                             double prob_sgl = TMath::Landau(e_dep[kk], mu_sglx[k], sigma_sglx[k]);
                             double prob_bkg = TMath::Landau(e_dep[kk], mu_bkgx[k], sigma_bkgx[k]);
-                            double threshold = 100.0;
+                            double threshold = 10.0;
                             if(prob_bkg > prob_sgl && (prob_bkg/prob_sgl) > threshold){ //se è più probabile che faccia parte del background rimuoviamo l'hit
                                 //cout<<"Hit singolo di rumore rimosso. Evento "<<i<<", energia depositata: "<<e_dep[kk]<<endl;
-                                //cout<<"Prob sgl: "<<prob_sgl<<"\nProb bkg: "<<prob_bkg<<endl;
+                                //cout<<"\nProb sgl: "<<prob_sgl<<", prob bkg: "<<prob_bkg<<endl;
                                 indx_rm.push_back(kk); 
                                 if(k==3 || k==4){
                                     h_casesx->Fill(10);
+                                    cout<<"Rumore su layer 4 o 5 evento: "<<i<<endl;
                                 }                               
                             }
                             break;
@@ -490,15 +587,15 @@ void fit_x(){
             }
 
             bkg_hit.push_back(bkg_hit_v); //aggiungo al vector il conteggio di hit di rumore trovati per l'evento i
-                     
+            
         }
                   
     }
 
-    TCanvas *c_traccex = new TCanvas("c_traccex", "c_traccex", 800, 600);
+    /*TCanvas *c_traccex = new TCanvas("c_traccex", "c_traccex", 800, 600);
     h_casesx->SetStats(0);
     h_casesx->SetFillColor(kAzure-3);
-    h_casesx->Draw("hist");
+    h_casesx->Draw("hist");*/
 
     double perc[10] = {
         h_casesx->GetBinContent(1)*100/prova, 
@@ -528,16 +625,40 @@ void fit_x(){
 
     double mean_bkg=0;
     double sigma_bkg=0;
+    TH1I *hit_bkgx = new TH1I("hit_bkgx", "Distribuzione degli hit di rumore su 1.000.000 di eventi (X); N hit; Entries", 6, -0.5, 5.5);
     for(int j=0; j<bkg_hit.size(); j++){
-        mean_bkg = mean_bkg + bkg_hit[j];
+        //mean_bkg = mean_bkg + bkg_hit[j];
+        hit_bkgx->Fill(bkg_hit[j]);
     }
-    mean_bkg = mean_bkg/((double) bkg_hit.size());
-    for(int j=0; j<bkg_hit.size(); j++){
-        sigma_bkg = sigma_bkg + (mean_bkg - bkg_hit[j])*(mean_bkg - bkg_hit[j]);
-    }
-    sigma_bkg = sqrt(sigma_bkg/((double) bkg_hit.size()));
-    cout<<"\nValore d'aspettazione hit di rumore per evento (X): "<<mean_bkg<<" +- "<<sigma_bkg/sqrt((double) bkg_hit.size())<<"\nDispersione (evidenza Poisson): "<<sigma_bkg<<endl;
+    cout<<"\nNumero di eventi con:"<<endl;
+    cout<<"0 hit di rumore: "<<hit_bkgx->GetBinContent(1)<<endl;
+    cout<<"1 hit di rumore: "<<hit_bkgx->GetBinContent(2)<<endl;
+    cout<<"2 hit di rumore: "<<hit_bkgx->GetBinContent(3)<<endl;
+    cout<<"3 hit di rumore: "<<hit_bkgx->GetBinContent(4)<<endl;
+    cout<<"4 hit di rumore: "<<hit_bkgx->GetBinContent(5)<<endl;
+    cout<<"5 hit di rumore: "<<hit_bkgx->GetBinContent(6)<<endl;
 
+    TF1 *f_pois = new TF1("f_pois", "[0] * TMath::Poisson(x, [1])", -0.5, 5.5);
+
+    // Impostiamo dei valori di stima iniziale sensati
+    f_pois->SetParameter(0, hit_bkgx->GetEntries()); // Stima iniziale normalizzazione
+    f_pois->SetParameter(1, hit_bkgx->GetMean());      // Stima iniziale della media (presa dall'istogramma)
+
+    // Eseguiamo il fit sull'istogramma dei conteggi di rumore
+    hit_bkgx->Fit(f_pois, "R N");
+    double ymax= f_pois->GetMaximum()*1.2;
+    hit_bkgx->SetMaximum(ymax);
+
+    // Estraiamo la media stimata dal fit
+    double mean_noise_hits = f_pois->GetParameter(1);
+    cout << "Numero medio di hit di rumore per evento (Poisson lambda): " << mean_noise_hits <<endl;
+
+
+    TCanvas *c_hit_bkgx = new TCanvas("c_hit_bkgx", "c_hit_bkgx", 800, 600);
+    hit_bkgx->SetFillColor(kGreen-3);
+    hit_bkgx->SetLineColor(kGreen-3);
+    hit_bkgx->Draw("hist");
+    f_pois->Draw("same");
 
         
 }
@@ -551,7 +672,7 @@ void fit_y(){
     vector<double> y;
     vector<double> e_dep;
 
-    vector<int> bkg_hit;
+    vector<int> bkg_hity;
       
     if(!t) cout<<"Nessun tree trovato"<<endl;
 
@@ -572,7 +693,7 @@ void fit_y(){
     double cov, var0, var1;
     bool cov_mat = false;
     for(Int_t i=0; i<t->GetEntries(); i++){
-        int bkg_hit_v=0;
+        int bkg_hity_v=0;
         t->GetEntry(i);
         bool traccia_pulita = true;
         //if(i%1000==0) cout<<"ciclo "<<i<<endl;
@@ -582,9 +703,13 @@ void fit_y(){
             e_dep.clear();
                         
             int punto1=0;
+            int null=0;
             int z1=0, z2=0, z3=0, z4=0, z5=0;
             for(int p=0; p<10; p++){
-                if(X[2][p]==-999 || X[1][p]==-999) continue;
+                if(X[2][p]==-999 || X[1][p]==-999){ 
+                    null++;
+                    continue;
+                }
                 z.push_back(X[2][p]);
                 y.push_back(X[1][p]);
                 punto1++;
@@ -598,6 +723,7 @@ void fit_y(){
 
                 //cout<<Form("Punto %d: (", punto1+1)<<z<<", "<<x<<")"<<endl;
             }
+            if(null==10)    cout<<"Evento senza hit!!!!"<<endl;
 
             int z_counts[5] = {z1, z2, z3, z4, z5};
             double z_coords[5] = {0., 250., 500., 750., 1000.};
@@ -610,7 +736,7 @@ void fit_y(){
                         if(z[kk]==z_coords[k]){
                             double prob_sgl = TMath::Landau(e_dep[kk], mu_sgly[k], sigma_sgly[k]);
                             double prob_bkg = TMath::Landau(e_dep[kk], mu_bkgy[k], sigma_bkgy[k]);
-                            double threshold = 100.0;
+                            double threshold = 10.0;
                             if(prob_bkg > prob_sgl && (prob_bkg/prob_sgl) > threshold){ //se è più probabile che faccia parte del background rimuoviamo l'hit
                                 //cout<<"Hit singolo di rumore rimosso. Evento "<<i<<", energia depositata: "<<e_dep[kk]<<endl;
                                 //cout<<"Prob sgl: "<<prob_sgl<<"\nProb bkg: "<<prob_bkg<<endl;
@@ -631,7 +757,7 @@ void fit_y(){
                     y.erase(y.begin()+indx_rm[p]);
                     z.erase(z.begin()+indx_rm[p]);
                     e_dep.erase(e_dep.begin()+indx_rm[p]);
-                    bkg_hit_v++; 
+                    bkg_hity_v++; 
                 }
             }
             if(indx_rm.size()==1){
@@ -707,7 +833,7 @@ void fit_y(){
                 z.erase(z.begin()+indx_rm_doubles[ii]);
                 y.erase(y.begin()+indx_rm_doubles[ii]);
                 e_dep.erase(e_dep.begin()+indx_rm_doubles[ii]);
-                bkg_hit_v++; 
+                bkg_hity_v++; 
             }
 
 
@@ -744,14 +870,14 @@ void fit_y(){
                 h_casesy->Fill(1);
             }
 
-            bkg_hit.push_back(bkg_hit_v); //aggiungo al vector il conteggio di hit di rumore trovati per l'evento i
+            bkg_hity.push_back(bkg_hity_v); //aggiungo al vector il conteggio di hit di rumore trovati per l'evento i
         }
     }
 
-    TCanvas *c_traccey = new TCanvas("c_traccey", "c_traccey", 800, 600);
+    /*TCanvas *c_traccey = new TCanvas("c_traccey", "c_traccey", 800, 600);
     h_casesy->SetStats(0);
     h_casesy->SetFillColor(kAzure-3);
-    h_casesy->Draw("hist");
+    h_casesy->Draw("hist");*/
 
     double perc[10] = {
         h_casesy->GetBinContent(1)*100/prova, 
@@ -779,18 +905,35 @@ void fit_y(){
     cout<<"hit di rumore sui layer 4 o 5: "<<h_casesy->GetBinContent(10)<<", "<<perc[9]<<"%"<<endl;
 
 
-    double mean_bkg=0;
-    double sigma_bkg=0;
-    for(int j=0; j<bkg_hit.size(); j++){
-        mean_bkg = mean_bkg + bkg_hit[j];
+    
+    cout<<"Vettore bkg_hity dimensione: "<<bkg_hity.size()<<endl;
+    TH1I *hit_bkgy = new TH1I("hit_bkgy", "Distribuzione degli hit di rumore su 1.000.000 di eventi (Y); N hit; Entries", 6, -0.5, 5.5);
+    for(int j=0; j<bkg_hity.size(); j++){
+        //mean_bkg = mean_bkg + bkg_hity[j];
+        hit_bkgy->Fill(bkg_hity[j]);
     }
-    mean_bkg = mean_bkg/((double) bkg_hit.size());
-    for(int j=0; j<bkg_hit.size(); j++){
-        sigma_bkg = sigma_bkg + (mean_bkg - bkg_hit[j])*(mean_bkg - bkg_hit[j]);
-    }
-    sigma_bkg = sqrt(sigma_bkg/((double) bkg_hit.size()));
-    cout<<"\nValore d'aspettazione hit di rumore per evento (Y): "<<mean_bkg<<" +- "<<sigma_bkg/sqrt((double) bkg_hit.size())<<"\nDispersione (evidenza Poisson): "<<sigma_bkg<<endl;
+    
+    TF1 *f_pois2 = new TF1("f_pois2", "[0] * TMath::Poisson(x, [1])", -0.5, 5.5);
 
+    // Impostiamo dei valori di stima iniziale sensati
+    f_pois2->SetParameter(0, hit_bkgy->GetEntries()); // Stima iniziale normalizzazione
+    f_pois2->SetParameter(1, hit_bkgy->GetMean());      // Stima iniziale della media (presa dall'istogramma)
+
+    // Eseguiamo il fit sull'istogramma dei conteggi di rumore
+    hit_bkgy->Fit(f_pois2, "R N");
+    double ymax= f_pois2->GetMaximum()*1.2;
+    hit_bkgy->SetMaximum(ymax);
+
+    // Estraiamo la media stimata dal fit
+    double mean_noise_hits = f_pois2->GetParameter(1);
+    cout << "Numero medio di hit di rumore per evento (Poisson lambda): " << mean_noise_hits <<endl;
+
+
+    TCanvas *c_hit_bkgy = new TCanvas("c_hit_bkgy", "c_hit_bkgy", 800, 600);
+    hit_bkgy->SetFillColor(kGreen-3);
+    hit_bkgy->SetLineColor(kGreen-3);
+    hit_bkgy->Draw("hist");
+    f_pois2->Draw("same");
 }
 
 
@@ -809,31 +952,3 @@ void DoAll(){
     cout<<"\nInizio analisi delle tracce per coordinata Y ..."<<endl;
     fit_y();
 }
-
-
-/*
-1000000 eventi totali recap (coordinata X)
-5 hit puliti: 701140, 70.114%
-1 single hit rimosso: 67871, 6.7871%
-2+ single hit rimossi: 0, 0%
-1 double hit: 358595, 35.8595%
-2+ double hit: 149355, 14.9355%
-1 triple hit: 33787, 3.3787%
-2+ triple hit: 1720, 0.172%
-double + triple hit: 50527, 5.0527%
-fit non possibile per troppi pochi punti: 4819, 0.4819%
-
-
-1000000 eventi totali recap (coordinata Y)
-5 hit puliti: 700555, 70.0555%
-1 single hit rimosso: 67681, 6.7681%
-2+ single hit rimossi: 1, 0.0001%
-1 double hit: 357886, 35.7886%
-2+ double hit: 149378, 14.9378%
-1 triple hit: 33993, 3.3993%
-2+ triple hit: 1709, 0.1709%
-double + triple hit: 50792, 5.0792%
-fit non possibile per troppi pochi punti: 4851, 0.4851%
-
-
-*/
