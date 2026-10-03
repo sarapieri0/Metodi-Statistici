@@ -1,3 +1,14 @@
+/*Codice per il calcolo della risoluzione spaziale dei layer del tracciatore + combinazione per miglior stima
+e calcolo delle efficienze di ciascun layer.
+
+Esecuzione:
+.L hits.cpp+
+.L risol_eff.cpp+
+DoAll()
+
+La funzione DoAll() chiama a sua volta le funzioni che estraggono i dati dal Tree, svolgono l'analisi dell'energia depositata
+ e calcolano risoluzioni ed efficienze prima per la coordinata x e poi per la y*/
+
 #include "TF1.h" 
 #include "TH1F.h" 
 #include "TH1I.h" 
@@ -16,6 +27,8 @@
 #include <TMath.h>
 #include <algorithm> 
 #include "hits_header.h"
+#include <TStyle.h> 
+#include <TLegend.h>
 
 using namespace std;
 
@@ -35,6 +48,9 @@ TH1F *E_depy2 = nullptr;
 TH1F *E_depy3 = nullptr;
 TH1F *E_depy4 = nullptr;
 TH1F *E_depy5 = nullptr;
+
+TH1F *E_depx_tot = nullptr;
+TH1F *E_depy_tot = nullptr;
 
 
 TH1F *hx1 = nullptr;
@@ -57,6 +73,8 @@ TCanvas *c_energiay = nullptr;
 
 
 int prova=1000000;
+
+
 
 
 vector<double> mu_bkgx;
@@ -120,118 +138,187 @@ void estrai(){
 void energy(){
     int num = t->GetEntries();
 
-    E_depx1 =new TH1F("E_depx1", "Energia depositata layer 1, coordinata X", sqrt(num), 0, 400000);
-    E_depx2 =new TH1F("E_depx2", "Energia depositata layer 2, coordinata X", sqrt(num), 0, 400000);
-    E_depx3 =new TH1F("E_depx3", "Energia depositata layer 3, coordinata X", sqrt(num), 0, 400000);
-    E_depx4 =new TH1F("E_depx4", "Energia depositata layer 4, coordinata X", sqrt(num), 0, 400000);
-    E_depx5 =new TH1F("E_depx5", "Energia depositata layer 5, coordinata X", sqrt(num), 0, 400000);
+    E_depx1 =new TH1F("E_depx1", "Energia depositata layer 1, coordinata X; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depx2 =new TH1F("E_depx2", "Energia depositata layer 2, coordinata X; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depx3 =new TH1F("E_depx3", "Energia depositata layer 3, coordinata X; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depx4 =new TH1F("E_depx4", "Energia depositata layer 4, coordinata X; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depx5 =new TH1F("E_depx5", "Energia depositata layer 5, coordinata X; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
 
-    E_depy1 =new TH1F("E_depy1", "Energia depositata layer 1, coordinata Y", sqrt(num), 0, 400000);
-    E_depy2 =new TH1F("E_depy2", "Energia depositata layer 2, coordinata Y", sqrt(num), 0, 400000);
-    E_depy3 =new TH1F("E_depy3", "Energia depositata layer 3, coordinata Y", sqrt(num), 0, 400000);
-    E_depy4 =new TH1F("E_depy4", "Energia depositata layer 4, coordinata Y", sqrt(num), 0, 400000);
-    E_depy5 =new TH1F("E_depy5", "Energia depositata layer 5, coordinata Y", sqrt(num), 0, 400000);
+    E_depy1 =new TH1F("E_depy1", "Energia depositata layer 1, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depy2 =new TH1F("E_depy2", "Energia depositata layer 2, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depy3 =new TH1F("E_depy3", "Energia depositata layer 3, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depy4 =new TH1F("E_depy4", "Energia depositata layer 4, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
+    E_depy5 =new TH1F("E_depy5", "Energia depositata layer 5, coordinata Y; Energia (eV); log(Entries)", sqrt(num), 0, 400000);
 
     for(Int_t i=0; i<t->GetEntries(); i++){
         t->GetEntry(i);
         //if(i%1000==0) cout<<"ciclo "<<i<<endl;
         for(int k=0; k<10; k++){
+            if(X[2][k] == -999) continue;
+            
             if(X[2][k]==0.){
                 E_depx1->Fill(Edep[0][k]);
                 E_depy1->Fill(Edep[1][k]);
             } 
-            if(X[2][k]==250.){
+            else if(X[2][k]==250.){
                 E_depx2->Fill(Edep[0][k]);
                 E_depy2->Fill(Edep[1][k]);
             }
-            if(X[2][k]==500.){
+            else if(X[2][k]==500.){
                 E_depx3->Fill(Edep[0][k]);
                 E_depy3->Fill(Edep[1][k]);
             }
-            if(X[2][k]==750.){
+            else if(X[2][k]==750.){
                 E_depx4->Fill(Edep[0][k]);
                 E_depy4->Fill(Edep[1][k]);
             }
-            if(X[2][k]==1000.){
+            else if(X[2][k]==1000.){
                 E_depx5->Fill(Edep[0][k]);
                 E_depy5->Fill(Edep[1][k]);
             }
+            else continue;
+            
         }    
     }
 
-    c_energiax = new TCanvas("c_energiax", "c_energiax", 3000, 600);
-    c_energiax->Divide(5,1);
-
-    c_energiay = new TCanvas("c_energiay", "c_energiay", 3000, 600);
-    c_energiay->Divide(5,1);
+    //TCanvas *c_x[5];
+    //gStyle->SetOptStat("ne"); 
+    //gStyle->SetOptFit(0);
 
     TH1F *h_listx[5] = {E_depx1, E_depx2, E_depx3, E_depx4, E_depx5};
     TH1F *h_listy[5] = {E_depy1, E_depy2, E_depy3, E_depy4, E_depy5};
 
-    for(int j=0; j<5; j++){
-        TF1 *f_bkg = new TF1("f_bkg", "landau", 0, 60000);
-        f_bkg->SetParameters(100000, 10000, 3000);
-        f_bkg->SetLineColor(kBlue);
+    
+    cout<<"\n---------------Coordinata X---------------"<<endl;
+    for(int i=0; i<5; i++){
+        //c_x[i] = new TCanvas(Form("c_x%d", i+1), Form("c_x%d", i+1), 800, 600);
 
-        TF1 *f_sgl = new TF1("f_sgl", "landau", 50000, 400000);
+        if(i<3){
+            TF1 *landau_tot = new TF1("landau_tot", "landau(0) + landau(3)", 0, 400000);
+            landau_tot->SetParameter(0, h_listx[i]->GetMaximum()*0.5);
+            landau_tot->SetParameter(1, 7500);
+            landau_tot->SetParameter(2, 7500);
+
+            landau_tot->SetParameter(3, h_listx[i]->GetMaximum()*0.5);
+            landau_tot->SetParameter(4, 86000);
+            landau_tot->SetParameter(5, 10000);
+
+            h_listx[i]->Fit(landau_tot, "L RQN");
+            mu_sglx.push_back(landau_tot->GetParameter(4));
+            sigma_sglx.push_back(landau_tot->GetParameter(5));
+            mu_bkgx.push_back(landau_tot->GetParameter(1));
+            sigma_bkgx.push_back(landau_tot->GetParameter(2));
+
+            //h_listx[i]->SetStats(0);
+           /*h_listx[i]->SetFillColor(kViolet-9);
+            h_listx[i]->SetLineColor(kViolet-9);
+            h_listx[i]->Draw("hist");
+            c_x[i]->SetLogy(1);
+            landau_tot->Draw("same");*/
+        }
+        
+
+        else{
+            TF1 *f_sgl = new TF1("f_sgl", "landau", 40000, 400000);
+            f_sgl->SetParameters(400000, 90000, 10000);
+
+            h_listx[i]->Fit(f_sgl, "RQN");
+            mu_sglx.push_back(f_sgl->GetParameter(1));
+            sigma_sglx.push_back(f_sgl->GetParameter(2));
+
+            //c_energiax->cd(j+1);
+            //c_x[i]->SetLogy(1);
+            //h_listx[j]->SetStats(0);
+            /*h_listx[i]->SetFillColor(kViolet-9);
+            h_listx[i]->SetLineColor(kViolet-9);
+            h_listx[i]->Draw("hist");
+            f_sgl->Draw("same");*/
+        }
+        //c_x[i]->Modified();
+        //c_x[i]->Update();
+        
+    }
+
+
+    cout<<"\n---------------Coordinata Y---------------"<<endl;
+    for(int i=0; i<3; i++){
+        TF1 *landau_tot = new TF1("landau_tot", "landau(0) + landau(3)", 0, 400000);
+        landau_tot->SetParameter(0, h_listy[i]->GetMaximum()*0.5);
+        landau_tot->SetParameter(1, 7500);
+        landau_tot->SetParameter(2, 7500);
+
+        landau_tot->SetParameter(3, h_listy[i]->GetMaximum()*0.5);
+        landau_tot->SetParameter(4, 86000);
+        landau_tot->SetParameter(5, 10000);
+
+        h_listy[i]->Fit(landau_tot, "L RQ N");
+        mu_sgly.push_back(landau_tot->GetParameter(4));
+        sigma_sgly.push_back(landau_tot->GetParameter(5));
+        mu_bkgy.push_back(landau_tot->GetParameter(1));
+        sigma_bkgy.push_back(landau_tot->GetParameter(2));
+    }
+
+    
+    for(int j=3; j<5; j++){
+
+        TF1 *f_sgl = new TF1("f_sgl", "landau", 40000, 400000);
         f_sgl->SetParameters(500000, 120000, 15000);
 
-    //COORDINATA X
-        c_energiax->cd(j+1);
-        gPad->SetLogy(1);
-        h_listx[j]->SetFillColor(kViolet-4);
-        h_listx[j]->SetLineColor(kViolet-4);
-        h_listx[j]->Draw("hist");
-        if(j<3){
-            h_listx[j]->Fit(f_bkg, "RQ");
-            mu_bkgx.push_back(f_bkg->GetParameter(1));
-            sigma_bkgx.push_back(f_bkg->GetParameter(2));
-            f_bkg->Draw("same");
-        }
-        else{
-            mu_bkgx.push_back(-999);
-        }
-        h_listx[j]->Fit(f_sgl, "RQ +");
-        mu_sglx.push_back(f_sgl->GetParameter(1));
-        sigma_sglx.push_back(f_sgl->GetParameter(2));
-        f_sgl->Draw("same");
-
-    //COORDINATA Y
-        c_energiay->cd(j+1);
-        gPad->SetLogy(1);
-        h_listy[j]->SetFillColor(kGreen-4);
-        h_listy[j]->SetLineColor(kGreen-4);
-        h_listy[j]->Draw("hist");
-        if(j<3){
-            h_listy[j]->Fit(f_bkg, "RQ");
-            mu_bkgy.push_back(f_bkg->GetParameter(1));
-            sigma_bkgy.push_back(f_bkg->GetParameter(2));
-            f_bkg->Draw("same");
-        }
-        else{
-            mu_bkgy.push_back(-999);
-        }
-        h_listy[j]->Fit(f_sgl, "RQ +");
+        h_listy[j]->Fit(f_sgl, "RQ N");
         mu_sgly.push_back(f_sgl->GetParameter(1));
         sigma_sgly.push_back(f_sgl->GetParameter(2));
-        f_sgl->Draw("same");
+
+        //gPad->SetLogy(1);
+        //h_listy[j]->SetStats(0);
+        //h_listy[j]->SetFillColor(kGreen-9);
+        //h_listy[j]->SetLineColor(kGreen-9);
+        //h_listy[j]->Draw("hist");
+        //f_sgl->Draw("same");        
+        
 
     }
 
 
-    /*cout<<"Medie Landau per rumore (background): "<<endl;
-    for(int i=0; i<5; i++){
+    
+    
+
+    /*cout<<"\n\nMedie Landau per rumore (background) X: "<<endl;
+    for(int i=0; i<3; i++){
         cout<<mu_bkgx[i]<<", ";
+    }
+    cout<<"\nSigma Landau per rumore (background) X: "<<endl;
+    for(int i=0; i<3; i++){
+        cout<<sigma_bkgx[i]<<", ";
     }*/
 
-    /*cout<<"\nMedie Landau per segnale (signal): "<<endl;
+    /*cout<<"\n\nMedie Landau per rumore (background) Y: "<<endl;
+    for(int i=0; i<3; i++){
+        cout<<mu_bkgy[i]<<", ";
+    }
+    cout<<"\nSigma Landau per rumore (background) Y: "<<endl;
+    for(int i=0; i<3; i++){
+        cout<<sigma_bkgy[i]<<", ";
+    }*/
+
+    
+    /*cout<<"\n\nMedie Landau per segnale (signal) X: "<<endl;
     for(int i=0; i<5; i++){
         cout<<mu_sglx[i]<<", ";
     }
-    cout<<"\nSigma Landau per segnale (signal): "<<endl;
+    cout<<"\nSigma Landau per segnale (signal) X: "<<endl;
     for(int i=0; i<5; i++){
         cout<<sigma_sglx[i]<<", ";
     }*/
+
+    /*cout<<"\n\nMedie Landau per segnale (signal) Y: "<<endl;
+    for(int i=0; i<5; i++){
+        cout<<mu_sgly[i]<<", ";
+    }
+    cout<<"\nSigma Landau per segnale (signal) Y: "<<endl;
+    for(int i=0; i<5; i++){
+        cout<<sigma_sgly[i]<<", ";
+    }*/
+
     
 }
 
@@ -261,7 +348,8 @@ void fit_x(){
 
     double cov, var0, var1;
     bool cov_mat = false;
-    int good_events1=0, good_events2=0, good_events3=0, good_events4=0, good_events5=0, good_events_tot=0;
+    int good_events1=0, good_events2=0, good_events3=0, good_events4=0, good_events5=0;
+    int good_events_tot=0;
     for(Int_t i=0; i<t->GetEntries(); i++){
         t->GetEntry(i);
         //if(i%1000==0) cout<<"ciclo "<<i<<endl;
@@ -312,7 +400,7 @@ void fit_x(){
                         if(z[kk]==z_coords[k]){
                             double prob_sgl = TMath::Landau(e_dep[kk], mu_sglx[k], sigma_sglx[k]);
                             double prob_bkg = TMath::Landau(e_dep[kk], mu_bkgx[k], sigma_bkgx[k]);
-                            double threshold = 100.0;
+                            double threshold = 10.0;
                             if(prob_bkg > prob_sgl && (prob_bkg/prob_sgl) > threshold){ //se è più probabile che faccia parte del background rimuoviamo l'hit
                                 //cout<<"Hit singolo di rumore rimosso. Evento "<<i<<", energia depositata: "<<e_dep[kk]<<" eV"<<endl;
                                 //cout<<"Prob sgl: "<<prob_sgl<<"\nProb bkg: "<<prob_bkg<<endl;
@@ -411,7 +499,7 @@ void fit_x(){
 
             
             
-            if (z.size() < 3){ //traccia incompleta non mi permette di effettuare un buon fit leave-one-out
+            if (z.size() < 4){ //traccia incompleta non mi permette di effettuare un buon fit leave-one-out
                 //cout<<"Punti insufficienti per fit. Evento "<<i<<endl;
                 z.clear();
                 x.clear();
@@ -483,7 +571,7 @@ void fit_x(){
                 }
                 
             }
-            if(fit > 2)   good_events_tot++; //se almeno 3 fit riescono conto l'evento come passaggio di particella
+            if(fit > 3)   good_events_tot++; //se almeno 3 fit riescono conto l'evento come passaggio di particella
             fit=0;
                   
         }
@@ -513,11 +601,11 @@ void fit_x(){
         var_res[k] = (f_gaus->GetParameter(2))*(f_gaus->GetParameter(2));
         sigma_res_err[k] = f_gaus->GetParError(2); 
 
-        cout << Form("--- Layer %d Diagnostics ---", k+1) << endl;
+        /*cout << Form("--- Layer %d Diagnostics ---", k+1) << endl;
         cout << "Numero di entry nell'istogramma: " << hists[k]->GetEntries() << endl;
         cout << "Sigma estratta: " << f_gaus->GetParameter(2) << endl;
         cout << "Errore riportato da ROOT: " << f_gaus->GetParError(2) << endl;
-        cout << "Chi2 / NDF: " << f_gaus->GetChisquare() / f_gaus->GetNDF() << endl;
+        cout << "Chi2 / NDF: " << f_gaus->GetChisquare() / f_gaus->GetNDF() << endl;*/
     }
     /*Nota bene: err_sigma = sigma/sqrt(2*N) dalla propagazione degli errori
     se N è dell'ordine di 10^4 o più, e la sigma estratta dal fit gaussiano è dell'ordine di 0.03... (10^-2)
@@ -562,7 +650,7 @@ void fit_x(){
 
     cout<<"\nRisoluzione pesata sui layer: "<<ris_tot<<" +- "<<sqrt(1/w_tot)<<endl;
 
-    /*cout<<"\nEventi buoni (passaggio particella): "<<good_events_tot<<endl;
+    cout<<"\n\nEventi buoni (passaggio particella): "<<good_events_tot<<endl;
     cout<<"\nEventi buoni per layer (X)"<<endl;
     cout<<"Layer 1: "<<good_events1<<endl;
     cout<<"Layer 2: "<<good_events2<<endl;
@@ -591,7 +679,7 @@ void fit_x(){
 
     eff[4]=(double) good_events5/(double) good_events_tot;
     sigma_eff[4] = sqrt(eff[4]*(1.-eff[4])/(double) good_events_tot);
-    cout<<"Layer 5: "<<eff[4]<<" +- "<<sigma_eff[4]<<", "<<eff[4]*100<<"%"<<endl;*/
+    cout<<"Layer 5: "<<eff[4]<<" +- "<<sigma_eff[4]<<", "<<eff[4]*100<<"%"<<endl;
 
 
 }
@@ -617,7 +705,6 @@ void fit_y(){
     hy4 = new TH1F("hy4", "Layer 4: scarti", sqrt(prova), -2,2);
     hy5 = new TH1F("hy5", "Layer 5: scarti", sqrt(prova), -2,2); 
 
-    
     double cov, var0, var1;
     bool cov_mat = false;
     int good_events1=0, good_events2=0, good_events3=0, good_events4=0, good_events5=0, good_events_tot=0;
@@ -658,7 +745,7 @@ void fit_y(){
                         if(z[kk]==z_coords[k]){
                             double prob_sgl = TMath::Landau(e_dep[kk], mu_sgly[k], sigma_sgly[k]);
                             double prob_bkg = TMath::Landau(e_dep[kk], mu_bkgy[k], sigma_bkgy[k]);
-                            double threshold = 100.0;
+                            double threshold = 10.0;
                             if(prob_bkg > prob_sgl && (prob_bkg/prob_sgl) > threshold){ //se è più probabile che faccia parte del background rimuoviamo l'hit
                                 //cout<<"Hit singolo di rumore rimosso. Evento "<<i<<", energia depositata: "<<e_dep[kk]<<endl;
                                 //cout<<"Prob sgl: "<<prob_sgl<<"\nProb bkg: "<<prob_bkg<<endl;
@@ -746,7 +833,7 @@ void fit_y(){
 
             
             
-            if (z.size() < 3){ //traccia incompleta non mi permette di effettuare un buon fit leave-one-out
+            if (z.size() < 4){ //traccia incompleta non mi permette di effettuare un buon fit leave-one-out
                 //cout<<"Punti insufficienti per fit. Evento "<<i<<endl;
                 z.clear();
                 y.clear();
@@ -819,6 +906,7 @@ void fit_y(){
                 
             }
             if(fit > 2)   good_events_tot++; //se almeno 3 fit riescono conto l'evento come passaggio di particella
+            else cout<<"fit < 2"<<endl;
             fit=0;
                   
         }
@@ -848,11 +936,11 @@ void fit_y(){
         var_res[k] = (f_gaus->GetParameter(2))*(f_gaus->GetParameter(2));
         sigma_res_err[k] = f_gaus->GetParError(2); 
 
-        cout << Form("--- Layer %d Diagnostics ---", k+1) << endl;
+        /*cout << Form("--- Layer %d Diagnostics ---", k+1) << endl;
         cout << "Numero di entry nell'istogramma: " << hists[k]->GetEntries() << endl;
         cout << "Sigma estratta: " << f_gaus->GetParameter(2) << endl;
         cout << "Errore riportato da ROOT: " << f_gaus->GetParError(2) << endl;
-        cout << "Chi2 / NDF: " << f_gaus->GetChisquare() / f_gaus->GetNDF() << endl;
+        cout << "Chi2 / NDF: " << f_gaus->GetChisquare() / f_gaus->GetNDF() << endl;*/
     }
 
     /*Nota bene: err_sigma = sigma/sqrt(2*N) dalla propagazione degli errori
@@ -895,7 +983,7 @@ void fit_y(){
 
     cout<<"\nRisoluzione pesata sui layer: "<<ris_tot<<" +- "<<sqrt(1/w_tot)<<endl;
 
-    /*cout<<"\nEventi buoni (passaggio particella): "<<good_events_tot<<endl;
+    cout<<"\n\nEventi buoni (passaggio particella): "<<good_events_tot<<endl;
     cout<<"\nEventi buoni per layer (Y)"<<endl;
     cout<<"Layer 1: "<<good_events1<<endl;
     cout<<"Layer 2: "<<good_events2<<endl;
@@ -924,13 +1012,10 @@ void fit_y(){
 
     eff[4]=(double) good_events5/(double) good_events_tot;
     sigma_eff[4] = sqrt(eff[4]*(1.-eff[4])/(double) good_events_tot);
-    cout<<"Layer 5: "<<eff[4]<<" +- "<<sigma_eff[4]<<", "<<eff[4]*100<<"%"<<endl;*/
+    cout<<"Layer 5: "<<eff[4]<<" +- "<<sigma_eff[4]<<", "<<eff[4]*100<<"%"<<endl;
 
 
 }
-
-
-
 
 
 
@@ -946,88 +1031,3 @@ void DoAll(){
     fit_y();
 
 }
-
-
-/*
-10000 eventi
-Layer 1: 0.439885
-   res: 0.193626
-   fit: 0.000126517
-Layer 2: 0.564209
-   res: 0.3184
-   fit: 6.81244e-05
-Layer 3: 0.611646
-   res: 0.374159
-   fit: 4.86603e-05
-Layer 4: 0.559028
-   res: 0.312581
-   fit: 6.81244e-05
-Layer 5: 0.444428
-   res: 0.197643
-   fit: 0.000126517
-
-
-
-
-100000 eventi
-Layer 1: 0.446602
-   res: 0.19958
-   fit: 0.000126517
-Layer 2: 0.56159
-   res: 0.315451
-   fit: 6.81244e-05
-Layer 3: 0.592656
-   res: 0.35129
-   fit: 4.86603e-05
-Layer 4: 0.553832
-   res: 0.306798
-   fit: 6.81244e-05
-Layer 5: 0.442821
-   res: 0.196217
-   fit: 0.000126517
-
-
-
-
-Medie Landau per segnale (signal): 
-86295.1, 85950.9, 86016.2, 86356.1, 86361.7
-
-
-------------- per 10.000 eventi -------------
-Eventi buoni (passaggio particella): 9891
-Efficienza per layer (X)
-Layer 1: 0.989789 +- 0.00101086, 98.9789%
-Layer 2: 0.876858 +- 0.00330406, 87.6858%
-Layer 3: 0.954605 +- 0.00209312, 95.4605%
-Layer 4: 0.836316 +- 0.00372022, 83.6316%
-Layer 5: 0.910323 +- 0.00287289, 91.0323%
-
-Eventi buoni (passaggio particella): 9876
-Efficienza per layer (Y)
-Layer 1: 0.990482 +- 0.000977026, 99.0482%
-Layer 2: 0.874949 +- 0.00332846, 87.4949%
-Layer 3: 0.956359 +- 0.00205574, 95.6359%
-Layer 4: 0.835865 +- 0.00372716, 83.5865%
-Layer 5: 0.915148 +- 0.00280406, 91.5148%
-
-
-
------------- per 100.000 eventi -------------
-Eventi buoni (passaggio particella): 98803
-Efficienza per layer (X)
-Layer 1: 0.98997 +- 0.000317013, 98.997%
-Layer 2: 0.876522 +- 0.00104663, 87.6522%
-Layer 3: 0.954769 +- 0.000661126, 95.4769%
-Layer 4: 0.835835 +- 0.00117846, 83.5835%
-Layer 5: 0.913363 +- 0.000894929, 91.3363%
-
-Eventi buoni (passaggio particella): 98777
-Efficienza per layer (Y)
-Layer 1: 0.99021 +- 0.000313272, 99.021%
-Layer 2: 0.873675 +- 0.00105704, 87.3675%
-Layer 3: 0.955597 +- 0.000655414, 95.5597%
-Layer 4: 0.836592 +- 0.00117643, 83.6592%
-Layer 5: 0.914069 +- 0.000891736, 91.4069%
-
-
-*/
